@@ -1,8 +1,10 @@
-import streamlit as st
-import pandas as pd
 from datetime import datetime
-import psycopg2
 import os
+
+import numpy as np
+import pandas as pd
+import psycopg2
+import streamlit as st
 
 st.title("Baarbierians Voting Form")
 # st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear at the bottom of the page which can be posted in the Whatsapp group.")
@@ -37,7 +39,6 @@ if __name__ == "__main__":
                   "Mark H", "Mark B", "Gary", "Panu", "Carlo", "Simon"]
     organisers.sort()
     organisers.append("Other")
-    organisers = [""] + organisers
 
     # Define players
     # TODO: Should be read in from the database
@@ -45,22 +46,21 @@ if __name__ == "__main__":
                "Mark H", "Mark B", "Gary", "Panu", "Carlo", "Simon"]
     players.sort()
     players.append("Other")
-    players = [""] + players
 
     # Date input outside the form
     date = st.date_input("Date", datetime.now(), format="DD.MM.YYYY")
 
     # Voting organiser selection outside the form
-    filled_by = st.selectbox("Voting Organiser", organisers, index=0)
+    filled_by = st.selectbox("Voting Host", organisers, index=None)
 
     # Conditional input for "Other" organiser
     if filled_by == "Other":
         filled_by = st.text_input("Enter organiser name")
 
-    form_data = []
+    results = pd.DataFrame(index=categories.keys(), columns=["Winner", "In Pub", "Points"])
 
     for category, positive in categories.items():
-        winner = st.selectbox(category, players, index=0)
+        winner = st.selectbox(category, players, index=None)
         if winner == "Add New Player":
             winner = st.text_input(f"New player:")
             players.add(winner)
@@ -76,12 +76,20 @@ if __name__ == "__main__":
         if not in_pub:
             points -= 1
 
-        form_data.append([date, filled_by, category, winner, in_pub, points])
+        results.loc[category] = [winner, in_pub, points]
 
     submitted = st.button("Submit")
 
     if submitted:
-        output = f"Voting results {date.strftime('%d.%m.%Y')}:\n"
-        for value in form_data:
-            output += f"\n{value[2]}: {value[3]} ({value[5]})"
-        st.write(output)
+        if None in results["Winner"].values or filled_by is None:
+            missing_vals = []
+            if filled_by is None:
+                missing_vals.append("Voting Host")
+            missing_vals = missing_vals + results[results["Winner"].isnull()].index.tolist()
+            error_string = "Please select names for these fields: " + ", ".join(missing_vals)
+            st.error(error_string)
+        else:
+            output = f"Voting results {date.strftime('%d.%m.%Y')}:\n"
+            for row in results:
+                output += f'\n{row.index}: {row.at["Winner"]} ({row.at["Points"]})'
+            st.write(output)
