@@ -24,6 +24,7 @@ def get_connection():
     )
 
 
+
 if __name__ == "__main__":
     # Define categories
     categories = {"Goal of the night": True,
@@ -35,18 +36,20 @@ if __name__ == "__main__":
                   "Greedy Bastard": False,
                   "Golden Goal": True,
                   "Captain's Performance": True}
+    
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    # Define organisers
-    # TODO: Should be read in from the database
-    organisers = ["Andrew", "Alistair", "Andy", "Scott",
-                  "Mark H", "Mark B", "Gary", "Panu", "Carlo", "Simon"]
+    # Fetch organisers
+    cursor.execute("SELECT DISTINCT filled_by FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
+    organisers = [val[0] for val in cursor.fetchall()]
     organisers.sort()
     organisers.append("Other")
+    
 
-    # Define players
-    # TODO: Should be read in from the database
-    players = ["Andrew", "Alistair", "Andy", "Scott",
-               "Mark H", "Mark B", "Gary", "Panu", "Carlo", "Simon"]
+    # Fetch players
+    cursor.execute("SELECT DISTINCT winner FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
+    players = [val[0] for val in cursor.fetchall()]
     players.sort()
     players.append("Other")
 
