@@ -1,17 +1,15 @@
 import psycopg2
-from dotenv import load_dotenv
-import os
-
-# Load environment variables from a .env file
-load_dotenv()
+import yaml
 
 # Function to get database connection
 def get_connection():
+    config = yaml.safe_load(open("config.yml"))
+
     return psycopg2.connect(
-        dbname=os.getenv('dbname'),
-        user=os.getenv('user'), 
-        password=os.getenv('password'), 
-        host=os.getenv('host'),
+        dbname=config['dbname'],
+        user=config['user'], 
+        password=config['password'], 
+        host=config['host'],
     )
 
 # Function to check database connection
