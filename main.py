@@ -96,7 +96,7 @@ if __name__ == "__main__":
             error_string = "Please select names for these fields: " + ", ".join(missing_vals)
             st.error(error_string)
         else:
-            output = f"**WhatsApp message:**\n\nVoting results {date.strftime('%d.%m.%Y')}:\n"
+            output = f"**Votes submitted**  \nPlease copy the submission below and send in the WhatsApp group.  \n\nVoting results {date.strftime('%d.%m.%Y')}:  \n"
             query_string = "INSERT INTO votes (date, filled_by, category, winner, in_pub, points) VALUES "
             for ind in results.index:
                 output += f'  \n{ind}: {results.at[ind, "Winner"]} ({results.at[ind, "Points"]})'
@@ -106,4 +106,4 @@ if __name__ == "__main__":
             query_string = query_string.replace("Captain's Performance", "Captains Performance")
             cursor.execute(query_string)
             conn.commit()
-            st.write(output)
+            st.warning(output, icon=":material/check_circle:")
