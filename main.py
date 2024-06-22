@@ -53,12 +53,17 @@ with st.form('voting_form'):
             winner = st.text_input(f'Enter new player name for {category}')
             players.add(winner)
         
-        in_pub = st.checkbox(f'Was {winner} in the pub for {category}?')
+        in_pub = st.checkbox(f'Was winner in the pub for {category}?')
 
         
-        points = 1 if category in positive_categories else -1
-        if in_pub == 'No':
-            points *= 2
+        if category in positive_categories:
+            points = 1
+        else:
+            points = -1
+        
+        if not in_pub:
+            points -= 1
+
         
         form_data.append([date, filled_by, category, winner, in_pub, points])
     
