@@ -22,7 +22,7 @@ def check_connection():
         cursor.execute("SELECT NOW();")
         
         # Fetch the result
-        result = cursor.fetchone()
+        result = cursor.fetchone()[0]
         print("Connection successful. Current date and time:", result)
         
     except Exception as e:
