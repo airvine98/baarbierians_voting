@@ -27,8 +27,8 @@ def get_connection():
 
 if __name__ == "__main__":
     # Define categories
-    categories = {"Goal of the night": True,
-                  "Save of the night": True,
+    categories = {"Goal of the Night": True,
+                  "Save of the Night": True,
                   "Skill Moment": True,
                   "Worst Tackle": False,
                   "Duffer": False,
@@ -67,9 +67,10 @@ if __name__ == "__main__":
 
     for category, positive in categories.items():
         winner = st.selectbox(category, players, index=None)
-        if winner == "Add New Player":
-            winner = st.text_input(f"New player:")
-            players.add(winner)
+        if winner == "Other":
+            winner = st.text_input(f"New player:", key=f"new_player_{category}")
+            players.insert(0, winner)
+            players = sorted(players[:-1]) + players[-1:]
 
         in_pub = (st.radio(f"In the Pub?", ("Yes", "No"),
                   key=f"{category}, in pub") == "Yes")
@@ -95,7 +96,14 @@ if __name__ == "__main__":
             error_string = "Please select names for these fields: " + ", ".join(missing_vals)
             st.error(error_string)
         else:
-            output = f"Voting results {date.strftime('%d.%m.%Y')}:\n"
-            for row in results:
-                output += f'\n{row.index}: {row.at["Winner"]} ({row.at["Points"]})'
+            output = f"**WhatsApp message:**\n\nVoting results {date.strftime('%d.%m.%Y')}:\n"
+            query_string = "INSERT INTO votes (date, filled_by, category, winner, in_pub, points) VALUES "
+            for ind in results.index:
+                output += f'  \n{ind}: {results.at[ind, "Winner"]} ({results.at[ind, "Points"]})'
+                query_string += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{ind}', '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
+            query_string = query_string[:-2]
+            query_string += " ON CONFLICT (date, category) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
+            query_string = query_string.replace("Captain's Performance", "Captains Performance")
+            cursor.execute(query_string)
+            conn.commit()
             st.write(output)
