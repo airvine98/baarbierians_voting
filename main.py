@@ -5,19 +5,22 @@ import numpy as np
 import pandas as pd
 import psycopg2
 import streamlit as st
+import yaml
 
 st.title("Baarbierians Voting Form")
 # st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear at the bottom of the page which can be posted in the Whatsapp group.")
 
 # Get database connection
 
-
+# Function to get database connection
 def get_connection():
+    config = yaml.safe_load(open("config.yml"))
+
     return psycopg2.connect(
-        dbname=os.getenv("dbname"),
-        user=os.getenv("user"),
-        password=os.getenv("password"),
-        host=os.getenv("host"),
+        dbname=config['dbname'],
+        user=config['user'], 
+        password=config['password'], 
+        host=config['host'],
     )
 
 
