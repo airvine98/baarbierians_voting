@@ -1,16 +1,14 @@
 from datetime import datetime
-import os
 
-import numpy as np
 import pandas as pd
 import psycopg2
 import streamlit as st
 import yaml
 
+TOTALS_START_DATE = "2023-11-11"
+
 st.title("Baarbierians Voting Form")
 # st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear at the bottom of the page which can be posted in the Whatsapp group.")
-
-# Get database connection
 
 # Function to get database connection
 def get_connection():
@@ -21,6 +19,7 @@ def get_connection():
         user=config['user'], 
         password=config['password'], 
         host=config['host'],
+        port=config['port']
     )
 
 
@@ -97,13 +96,18 @@ if __name__ == "__main__":
             st.error(error_string)
         else:
             output = f"**Votes submitted**  \nPlease copy the submission below and send in the WhatsApp group.  \n\nVoting results {date.strftime('%d.%m.%Y')}:  \n"
-            query_string = "INSERT INTO votes (date, filled_by, category, winner, in_pub, points) VALUES "
+            votes_query = "INSERT INTO votes (date, filled_by, category, winner, in_pub, points) VALUES "
             for ind in results.index:
                 output += f'  \n{ind}: {results.at[ind, "Winner"]} ({results.at[ind, "Points"]})'
-                query_string += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{ind}', '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
-            query_string = query_string[:-2]
-            query_string += " ON CONFLICT (date, category) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
-            query_string = query_string.replace("Captain's Performance", "Captains Performance")
-            cursor.execute(query_string)
+                votes_query += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{ind}', '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
+            votes_query = votes_query[:-2]
+            votes_query += " ON CONFLICT (date, category) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
+            votes_query = votes_query.replace("n's", "ns")
+            cursor.execute(votes_query)
+            for category in categories.keys():
+                totals_query = f"TRUNCATE TABLE {category.lower().replace(' ', '_')};"
+                totals_query += f"INSERT INTO {category.lower().replace(' ', '_')} (name, votes_won, points) SELECT winner, COUNT(*), SUM(points) FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' GROUP BY winner ON CONFLICT (name) DO UPDATE SET votes_won = EXCLUDED.votes_won, points = EXCLUDED.points;"
+                totals_query = totals_query.replace("n's", "ns")
+                cursor.execute(totals_query)
             conn.commit()
             st.warning(output, icon=":material/check_circle:")
