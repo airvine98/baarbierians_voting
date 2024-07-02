@@ -3,23 +3,32 @@ from datetime import datetime
 import pandas as pd
 import psycopg2
 import streamlit as st
-import yaml
+# import yaml
+import os
+from dotenv import load_dotenv
 
 TOTALS_START_DATE = "2023-11-11"
 
+load = load_dotenv()
+
 st.title("Baarbierians Voting Form")
 # st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear at the bottom of the page which can be posted in the Whatsapp group.")
+# Read environment variables
+db_name = os.getenv('dbname')
+db_user = os.getenv('user')
+db_password = os.getenv('password')
+db_host = os.getenv('host')
+
 
 # Function to get database connection
 def get_connection():
-    config = yaml.safe_load(open("config.yml"))
+    #config = yaml.safe_load(open("config.yml"))
 
     return psycopg2.connect(
-        dbname=config['dbname'],
-        user=config['user'], 
-        password=config['password'], 
-        host=config['host'],
-        port=config['port']
+        dbname = db_name,
+        user = db_user,
+        password = db_password,
+        host = db_host
     )
 
 
