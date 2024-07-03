@@ -48,6 +48,8 @@ def submission_popup():
     placeholder = st.empty()
     confirm = placeholder.button("Confirm")
     if confirm:
+        clear_date_query = f"DELETE FROM votes WHERE date = '{date.strftime('%Y-%m-%d')}';"
+        cursor.execute(clear_date_query)
         votes_query = "INSERT INTO votes (date, filled_by, category, winner_num, winner, in_pub, points) VALUES "
         for ind in results.index:
             votes_query += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{results.at[ind, 'Category']}', {results.at[ind, 'Winner Number']}, '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
