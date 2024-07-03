@@ -39,6 +39,33 @@ def get_connection():
     )
 
 
+@st.experimental_dialog("Check your submission and confirm")
+def submission_popup():
+    message = f"**Voting results {date.strftime('%d.%m.%Y')}:**  \n"
+    for category in results["Category"].unique():
+        message += f'  \n{category}: ' +  ", ".join([f'{winner}  ({points})' for winner, points in results[results["Category"]==category][["Winner", "Points"]].values])
+    st.write(message)
+    placeholder = st.empty()
+    confirm = placeholder.button("Confirm")
+    if confirm:
+        votes_query = "INSERT INTO votes (date, filled_by, category, winner_num, winner, in_pub, points) VALUES "
+        for ind in results.index:
+            votes_query += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{results.at[ind, 'Category']}', {results.at[ind, 'Winner Number']}, '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
+        votes_query = votes_query[:-2]
+        votes_query += " ON CONFLICT (date, category, winner_num) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
+        votes_query = votes_query.replace("n's", "ns")
+        cursor.execute(votes_query)
+        for category in categories.keys():
+            totals_query = f"TRUNCATE TABLE {category.lower().replace(' ', '_')};"
+            totals_query += f"INSERT INTO {category.lower().replace(' ', '_')} (name, votes_won, points) SELECT winner, COUNT(*), SUM(points) FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' GROUP BY winner ON CONFLICT (name) DO UPDATE SET votes_won = EXCLUDED.votes_won, points = EXCLUDED.points;"
+            totals_query = totals_query.replace("n's", "ns")
+            cursor.execute(totals_query)
+        conn.commit()
+        output = "**Votes submitted**  \nPlease copy the votes above and send in the WhatsApp group."
+        st.warning(output, icon=":material/check_circle:")
+        placeholder.empty()
+
+
 
 if __name__ == "__main__":
     # Define categories
@@ -125,24 +152,8 @@ if __name__ == "__main__":
             missing_vals = []
             if filled_by is None:
                 missing_vals.append("  \nVoting Host")
-            missing_vals = missing_vals + [f'  \n  {results.at[idx, "Category"]} (Winner {results.at[idx, "Winner Number"]})' for idx in results[results["Winner"].isnull()].index]
+            missing_vals = missing_vals + [f'  \n{results.at[idx, "Category"]} (Winner {results.at[idx, "Winner Number"]})' for idx in results[results["Winner"].isnull()].index]
             error_string = "Please select names for these fields: " + ", ".join(missing_vals)
             st.error(error_string)
         else:
-            output = f"**Votes submitted**  \nPlease copy the submission below and send in the WhatsApp group.  \n\nVoting results {date.strftime('%d.%m.%Y')}:  \n"
-            votes_query = "INSERT INTO votes (date, filled_by, category, winner_num, winner, in_pub, points) VALUES "
-            for category in results["Category"].unique():
-                output += f'  \n{category}: ' +  ", ".join([f'{winner}  ({points})' for winner, points in results[results["Category"]==category][["Winner", "Points"]].values])
-            for ind in results.index:
-                votes_query += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{results.at[ind, 'Category']}', {results.at[ind, 'Winner Number']}, '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
-            votes_query = votes_query[:-2]
-            votes_query += " ON CONFLICT (date, category, winner_num) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
-            votes_query = votes_query.replace("n's", "ns")
-            cursor.execute(votes_query)
-            for category in categories.keys():
-                totals_query = f"TRUNCATE TABLE {category.lower().replace(' ', '_')};"
-                totals_query += f"INSERT INTO {category.lower().replace(' ', '_')} (name, votes_won, points) SELECT winner, COUNT(*), SUM(points) FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' GROUP BY winner ON CONFLICT (name) DO UPDATE SET votes_won = EXCLUDED.votes_won, points = EXCLUDED.points;"
-                totals_query = totals_query.replace("n's", "ns")
-                cursor.execute(totals_query)
-            conn.commit()
-            st.warning(output, icon=":material/check_circle:")
+            submission_popup()
