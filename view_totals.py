@@ -28,7 +28,10 @@ if __name__ == "__main__":
 
     missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays if date not in dates]
 
-    print("Missing Fridays:\n" + "\n".join(missing_fridays))
+    if len(missing_fridays) > 0:
+        print("\nMissing Fridays:\n" + "\n".join(missing_fridays))
+    else:
+        print(f"\nVotes have been submitted for every Friday since {TOTALS_START_DATE}.")
 
     # Define categories (and if positive)
     categories = {"Goal of the Night": True,
