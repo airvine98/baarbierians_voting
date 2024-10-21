@@ -3,6 +3,8 @@ from sqlalchemy import create_engine
 import yaml
 
 
+TOTALS_START_DATE = "2023-11-11"
+
 # Function to get database connection
 def get_connection():
     config = yaml.safe_load(open("config.yml"))
@@ -12,7 +14,23 @@ def get_connection():
 
 
 if __name__ == "__main__":
-    # Define categories
+    engine = get_connection()
+
+    # Check for missing fridays
+    fridays = pd.date_range(
+        start=pd.to_datetime(TOTALS_START_DATE),
+        end=pd.Timestamp.today(),
+        freq="W-FRI"
+    ).date
+
+    dates_query = f"SELECT DISTINCT date FROM votes ORDER BY date ASC;"
+    dates = pd.read_sql(dates_query, engine)["date"].to_list()
+
+    missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays if date not in dates]
+
+    print("Missing Fridays:\n" + "\n".join(missing_fridays))
+
+    # Define categories (and if positive)
     categories = {"Goal of the Night": True,
                   "Save of the Night": True,
                   "Skill Moment": True,
@@ -22,8 +40,6 @@ if __name__ == "__main__":
                   "Greedy Bastard": False,
                   "Golden Goal": True,
                   "Captain's Performance": True}
-    
-    engine = get_connection()
 
     # votes_query = f"TRUNCATE TABLE votes;"
     # cursor.execute(votes_query)
