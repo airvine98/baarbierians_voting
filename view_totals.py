@@ -1,4 +1,6 @@
+from ics import Calendar
 import pandas as pd
+import requests
 from sqlalchemy import create_engine
 import yaml
 
@@ -23,10 +25,17 @@ if __name__ == "__main__":
         freq="W-FRI"
     ).date
 
+    # Hünenberg holidays calendar https://www.feiertagskalender.ch/export_ical.php?geo=2863
+    url = "https://fcal.ch/privat/fcal_holidays.ics.php?hl=de&klasse=3&geo=2863"
+    calendar = Calendar(requests.get(url).text)
+    holidays = [x.begin.date() for x in list(calendar.events)]
+
+    fridays_excl_holidays = [date for date in fridays if date not in holidays]
+
     dates_query = f"SELECT DISTINCT date FROM votes ORDER BY date ASC;"
     dates = pd.read_sql(dates_query, engine)["date"].to_list()
 
-    missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays if date not in dates]
+    missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays_excl_holidays if date not in dates]
 
     if len(missing_fridays) > 0:
         print("\nMissing Fridays:\n" + "\n".join(missing_fridays))
