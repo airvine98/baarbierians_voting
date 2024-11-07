@@ -8,6 +8,7 @@ import streamlit as st
 # import yaml
 
 TOTALS_START_DATE = "2023-11-11"
+TOTALS_END_DATE = "2024-11-09"
 
 load = load_dotenv()
 
@@ -62,7 +63,7 @@ def submission_popup():
         cursor.execute(votes_query)
         for category in categories.keys():
             totals_query = f"TRUNCATE TABLE {category.lower().replace(' ', '_')};"
-            totals_query += f"INSERT INTO {category.lower().replace(' ', '_')} (name, votes_won, points) SELECT winner, COUNT(*), SUM(points) FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' GROUP BY winner ON CONFLICT (name) DO UPDATE SET votes_won = EXCLUDED.votes_won, points = EXCLUDED.points;"
+            totals_query += f"INSERT INTO {category.lower().replace(' ', '_')} (name, votes_won, points) SELECT winner, COUNT(*), SUM(points) FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' AND date <= '{TOTALS_END_DATE}' GROUP BY winner ON CONFLICT (name) DO UPDATE SET votes_won = EXCLUDED.votes_won, points = EXCLUDED.points;"
             totals_query = totals_query.replace("n's", "ns")
             cursor.execute(totals_query)
         conn.commit()
