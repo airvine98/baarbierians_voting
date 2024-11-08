@@ -1,45 +1,68 @@
+from pathlib import Path
+
 from fpdf import FPDF
+from fpdf.fonts import FontFace
+from ics import Calendar
 import pandas as pd
+import requests
 from sqlalchemy import create_engine
 import yaml
-from ics import Calendar
-import requests
-import os
+
 
 TOTALS_START_DATE = "2023-11-11"
+TOTALS_END_DATE = "2024-11-09"
 
-# Function to get database connection
+
 def get_connection():
+    """create the engine to connect to the database
+
+    Returns:
+        _engine.Engine: Engine to connect to database
+    """
     config = yaml.safe_load(open("config.yml"))
     return create_engine(f"postgresql+psycopg2://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}")
 
-# Simplified function to create a PDF with tables
-def create_pdf_with_tables(filename, category_data):
+
+def create_pdf_with_tables(filename: str, category_data: dict):
+    """create the results pdf
+
+    Args:
+        filename (str): name of file for pdf
+        category_data (dict): results data to be displayed
+    """
+    filename = Path(filename)
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Arial", size=10)
+    pdf.set_font("Helvetica", size=10)
+    headings_style = FontFace(emphasis="BOLD", fill_color=[170]*3)
 
     for category, df in category_data.items():
         pdf.add_page()
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 10, txt=category, ln=True, align='C')
-        pdf.set_font("Arial", size=10)
+        pdf.image(Path("images/badge.png"), x=10, y=10, w=30)
+        pdf.image(Path("images/badge.png"), x=pdf.w-40, y=10, w=30)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, text=f'{category} ({pd.to_datetime(TOTALS_START_DATE).date().strftime("%d/%m/%Y")} - {pd.to_datetime(TOTALS_END_DATE).date().strftime("%d/%m/%Y")})', align='C')
+        pdf.ln(15)
+        pdf.set_font("Helvetica", size=10)
 
-        # Create table header
-        headers = ['Name'] + list(df.columns)
-        pdf.set_fill_color(200, 200, 200)
-        for header in headers:
-            pdf.cell(40, 8, header, border=1, fill=True, align='C')
-        pdf.ln()
+        with pdf.table(headings_style=headings_style, text_align="CENTER", width=100, col_widths=(50, 25, 25)) as table:
+            # Create table header
+            headers = ['Name'] + [x.replace("_", " ").title() for x in df.columns]
+            row = table.row()
+            for header in headers:
+                row.cell(header)
 
-        # Add table rows
-        for index, row in df.iterrows():
-            pdf.cell(40, 8, str(index), border=1, align='C')
-            for item in row:
-                pdf.cell(40, 8, str(item), border=1, align='C')
-            pdf.ln()
-
+            # Add table rows
+            for index, vals in df.iterrows():
+                row = table.row()
+                row.cell(str(index))
+                for item in vals:
+                    row.cell(str(item))
+    filename.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(filename)
+    print(f"PDF has been created: {str(filename)}")
+
 
 if __name__ == "__main__":
     engine = get_connection()
@@ -47,7 +70,7 @@ if __name__ == "__main__":
     # Check for missing fridays
     fridays = pd.date_range(
         start=pd.to_datetime(TOTALS_START_DATE),
-        end=pd.Timestamp.today(),
+        end=pd.to_datetime(TOTALS_END_DATE),
         freq="W-FRI"
     ).date
 
@@ -91,5 +114,7 @@ if __name__ == "__main__":
         category_data[category] = df.head(30)  # Add top 10 to the dictionary
 
     # Create PDF
-    create_pdf_with_tables("category_results.pdf", category_data)
-    print("PDF has been created: category_results.pdf")
+    create_pdf_with_tables(
+        f"results/voting_results_{pd.to_datetime(TOTALS_END_DATE).year}.pdf",
+        category_data
+    )
