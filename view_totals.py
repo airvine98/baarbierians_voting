@@ -9,8 +9,8 @@ from sqlalchemy import create_engine
 import yaml
 
 
-TOTALS_START_DATE = "2023-11-11"
-TOTALS_END_DATE = "2024-11-09"
+TOTALS_START_DATE = "2024-11-09"
+TOTALS_END_DATE = "2025-11-08"
 
 
 def get_connection():
@@ -48,7 +48,7 @@ def create_pdf_with_tables(filename: str, category_data: dict):
 
         with pdf.table(headings_style=headings_style, text_align="CENTER", width=100, col_widths=(50, 25, 25)) as table:
             # Create table header
-            headers = ['Name'] + [x.replace("_", " ").title() for x in df.columns]
+            headers = [x.replace("_", " ").title() for x in df.columns]
             row = table.row()
             for header in headers:
                 row.cell(header)
@@ -56,7 +56,6 @@ def create_pdf_with_tables(filename: str, category_data: dict):
             # Add table rows
             for index, vals in df.iterrows():
                 row = table.row()
-                row.cell(str(index))
                 for item in vals:
                     row.cell(str(item))
     filename.parent.mkdir(parents=True, exist_ok=True)
@@ -108,13 +107,13 @@ if __name__ == "__main__":
     category_data = {}
 
     for category, positive in categories.items():
-        totals_query = f"SELECT * FROM {category.lower().replace(' ', '_')} ORDER BY points {'DESC' if positive else 'ASC'}, votes_won DESC;"
+        totals_query = f"SELECT winner AS name, COUNT(*) AS votes_won, SUM(points) AS points FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' AND date < '{TOTALS_END_DATE}' GROUP BY winner ORDER BY points {'DESC' if positive else 'ASC'}, votes_won DESC;"
         totals_query = totals_query.replace("n's", "ns")
-        df = pd.read_sql(totals_query, engine, index_col="name")
-        category_data[category] = df.head(30)  # Add top 10 to the dictionary
+        df = pd.read_sql(totals_query, engine)
+        category_data[category] = df.head(30)
 
     # Create PDF
     create_pdf_with_tables(
-        f"results/voting_results_{pd.to_datetime(TOTALS_END_DATE).year}.pdf",
+        f"results/voting_results_{pd.to_datetime(TOTALS_START_DATE).date()}_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf",
         category_data
     )

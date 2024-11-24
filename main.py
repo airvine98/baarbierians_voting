@@ -62,11 +62,6 @@ def submission_popup():
         votes_query += " ON CONFLICT (date, category, winner_num) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
         votes_query = votes_query.replace("n's", "ns")
         cursor.execute(votes_query)
-        for category in categories.keys():
-            totals_query = f"TRUNCATE TABLE {category.lower().replace(' ', '_')};"
-            totals_query += f"INSERT INTO {category.lower().replace(' ', '_')} (name, votes_won, points) SELECT winner, COUNT(*), SUM(points) FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' AND date <= '{TOTALS_END_DATE}' GROUP BY winner ON CONFLICT (name) DO UPDATE SET votes_won = EXCLUDED.votes_won, points = EXCLUDED.points;"
-            totals_query = totals_query.replace("n's", "ns")
-            cursor.execute(totals_query)
         conn.commit()
         output = "**Votes submitted**  \nPlease copy the votes above and send in the WhatsApp group."
         st.success(output, icon=":material/check_circle:")
