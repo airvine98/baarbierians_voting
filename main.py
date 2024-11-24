@@ -7,13 +7,10 @@ import psycopg2
 import streamlit as st
 # import yaml
 
-TOTALS_START_DATE = "2023-11-11"
-TOTALS_END_DATE = "2024-11-09"
-
 load = load_dotenv()
 
 st.title("Baarbierians Voting Form")
-# st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear at the bottom of the page which can be posted in the Whatsapp group.")
+# st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear which can be posted in the Whatsapp group.")
 # Read environment variables
 db_name = os.getenv('dbname')
 db_user = os.getenv('user')
