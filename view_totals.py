@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 from fpdf import FPDF
@@ -9,8 +10,8 @@ from sqlalchemy import create_engine
 import yaml
 
 
-TOTALS_START_DATE = "2024-11-09"
-TOTALS_END_DATE = "2025-11-08"
+TOTALS_START_DATE = "2024-11-09" # None
+TOTALS_END_DATE = "2025-11-08" # None
 
 
 def get_connection():
@@ -23,28 +24,43 @@ def get_connection():
     return create_engine(f"postgresql+psycopg2://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}")
 
 
-def create_pdf_with_tables(filename: str, category_data: dict):
+def create_pdf_with_tables(folder: str, category_data: dict):
     """create the results pdf
 
     Args:
-        filename (str): name of file for pdf
+        folder (str): name of folder for pdf
         category_data (dict): results data to be displayed
     """
-    filename = Path(filename)
+    
+    if TOTALS_START_DATE is None and TOTALS_END_DATE is None:
+        filename = f"voting_results_all_time.pdf"
+        title_text_dates = 'all time'
+    elif TOTALS_START_DATE is None and TOTALS_END_DATE is not None:
+        filename = f"voting_results_until_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf"
+        title_text_dates = f'until {pd.to_datetime(TOTALS_END_DATE).date().strftime("%d/%m/%Y")}'
+    elif TOTALS_START_DATE is not None and TOTALS_END_DATE is None:
+        filename = f"voting_results_since_{pd.to_datetime(TOTALS_START_DATE).date()}.pdf"
+        title_text_dates = f'since {pd.to_datetime(TOTALS_START_DATE).date().strftime("%d/%m/%Y")}'
+    else:
+        filename = f"voting_results_{pd.to_datetime(TOTALS_START_DATE).date()}_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf"
+        title_text_dates = f'{pd.to_datetime(TOTALS_START_DATE).date().strftime("%d/%m/%Y")} - {pd.to_datetime(TOTALS_END_DATE).date().strftime("%d/%m/%Y")}'
+
+    filename = Path(folder).joinpath(filename)
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Helvetica", size=10)
-    headings_style = FontFace(emphasis="BOLD", fill_color=[170]*3)
+    font_name = "Helvetica"
+    pdf.set_font(font_name, size=10)
+    headings_style = FontFace(font_name, emphasis="BOLD", fill_color=[170]*3)
 
     for category, df in category_data.items():
         pdf.add_page()
         pdf.image(Path("images/badge.png"), x=10, y=10, w=30)
         pdf.image(Path("images/badge.png"), x=pdf.w-40, y=10, w=30)
-        pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(0, 10, text=f'{category} ({pd.to_datetime(TOTALS_START_DATE).date().strftime("%d/%m/%Y")} - {pd.to_datetime(TOTALS_END_DATE).date().strftime("%d/%m/%Y")})', align='C')
+        pdf.set_font(font_name, "B", 14)
+        pdf.cell(0, 10, text=f'{category} ({title_text_dates})', align='C')
         pdf.ln(15)
-        pdf.set_font("Helvetica", size=10)
+        pdf.set_font(font_name, size=10)
 
         with pdf.table(headings_style=headings_style, text_align="CENTER", width=100, col_widths=(50, 25, 25)) as table:
             # Create table header
@@ -57,7 +73,7 @@ def create_pdf_with_tables(filename: str, category_data: dict):
             for index, vals in df.iterrows():
                 row = table.row()
                 for item in vals:
-                    row.cell(str(item))
+                    row.cell(str(item).replace("’","'"))
     filename.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(filename)
     print(f"PDF has been created: {str(filename)}")
@@ -68,8 +84,8 @@ if __name__ == "__main__":
 
     # Check for missing fridays
     fridays = pd.date_range(
-        start=pd.to_datetime(TOTALS_START_DATE),
-        end=pd.to_datetime(TOTALS_END_DATE),
+        start=max(pd.to_datetime(TOTALS_START_DATE) if TOTALS_START_DATE is not None else pd.to_datetime("2014-01-01"), pd.to_datetime("2014-01-01")),
+        end=min(pd.to_datetime(TOTALS_END_DATE) if TOTALS_END_DATE is not None else datetime.now(), datetime.now()),
         freq="W-FRI"
     ).date
 
@@ -90,30 +106,35 @@ if __name__ == "__main__":
     else:
         print(f"\nVotes have been submitted for every Friday since {TOTALS_START_DATE}.")
 
-    # Define categories (and if positive)
-    categories = {
-        "Goal of the Night": True,
-        "Save of the Night": True,
-        "Skill Moment": True,
-        "Worst Tackle": False,
-        "Duffer": False,
-        "Drama Queen": False,
-        "Greedy Bastard": False,
-        "Golden Goal": True,
-        "Captain's Performance": True
-    }
-
     # Dictionary to store category data
     category_data = {}
 
+    queries_date_limits = list()
+    if TOTALS_START_DATE is not None:
+        queries_date_limits.append(f"date >= '{TOTALS_START_DATE}'")
+    if TOTALS_END_DATE is not None:
+        queries_date_limits.append(f"date < '{TOTALS_END_DATE}'")
+
+    # Get categories and if positive
+    categories_query = "SELECT category, AVG(points) >= 0 as positive FROM votes"
+    if len(queries_date_limits) > 0:
+        categories_query = categories_query + " WHERE " + " AND ".join(queries_date_limits)
+    categories_query = categories_query + " GROUP BY category ORDER BY positive DESC, category ASC;"
+    categories = pd.read_sql(categories_query, engine).set_index("category").to_dict()["positive"]
+    categories["Captain's Performance"] = categories.pop("Captains Performance")
+
+    # Get totals
     for category, positive in categories.items():
-        totals_query = f"SELECT winner AS name, COUNT(*) AS votes_won, SUM(points) AS points FROM votes WHERE category = '{category}' AND date >= '{TOTALS_START_DATE}' AND date < '{TOTALS_END_DATE}' GROUP BY winner ORDER BY points {'DESC' if positive else 'ASC'}, votes_won DESC;"
-        totals_query = totals_query.replace("n's", "ns")
+        totals_query = f"SELECT winner AS name, COUNT(*) AS votes_won, SUM(points) AS points FROM votes WHERE category = '{category}'"
+        if len(queries_date_limits) > 0:
+            totals_query = totals_query + " AND " + " AND ".join(queries_date_limits)
+        totals_query = totals_query + f" GROUP BY winner ORDER BY points {'DESC' if positive else 'ASC'}, votes_won DESC;"
+        totals_query = totals_query.replace("Captain's", "Captains")
         df = pd.read_sql(totals_query, engine)
         category_data[category] = df.head(30)
 
     # Create PDF
     create_pdf_with_tables(
-        f"results/voting_results_{pd.to_datetime(TOTALS_START_DATE).date()}_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf",
+        f"results",
         category_data
     )

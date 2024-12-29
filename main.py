@@ -11,11 +11,24 @@ load = load_dotenv()
 
 st.title("Baarbierians Voting Form")
 # st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear which can be posted in the Whatsapp group.")
+
 # Read environment variables
 db_name = os.getenv('dbname')
 db_user = os.getenv('user')
 db_password = os.getenv('password')
 db_host = os.getenv('host')
+
+
+# Define categories and if positive
+CATEGORIES = {"Goal of the Night": True,
+            "Save of the Night": True,
+            "Skill Moment": True,
+            "Worst Tackle": False,
+            "Duffer": False,
+            "Drama Queen": False,
+            "Greedy Bastard": False,
+            "Golden Goal": True,
+            "Captain's Performance": True}
 
 
 # Function to get database connection
@@ -57,7 +70,7 @@ def submission_popup():
                 votes_query += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{results.at[ind, 'Category']}', {results.at[ind, 'Winner Number']}, '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
         votes_query = votes_query[:-2]
         votes_query += " ON CONFLICT (date, category, winner_num) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
-        votes_query = votes_query.replace("n's", "ns")
+        votes_query = votes_query.replace("Captain's", "Captains")
         cursor.execute(votes_query)
         conn.commit()
         output = "**Votes submitted**  \nPlease copy the votes above and send in the WhatsApp group."
@@ -97,17 +110,6 @@ def voting_host():
 if __name__ == "__main__":
 
     with st.spinner("Loading ..."):
-        # Define categories
-        categories = {"Goal of the Night": True,
-                    "Save of the Night": True,
-                    "Skill Moment": True,
-                    "Worst Tackle": False,
-                    "Duffer": False,
-                    "Drama Queen": False,
-                    "Greedy Bastard": False,
-                    "Golden Goal": True,
-                    "Captain's Performance": True}
-        
         conn = get_connection()
         cursor = conn.cursor()
 
@@ -132,7 +134,7 @@ if __name__ == "__main__":
 
         results = pd.DataFrame(columns=["Category", "Winner Number", "Winner", "In Pub", "Points"])
 
-        for category, positive in categories.items():
+        for category, positive in CATEGORIES.items():
             st.write(category)
             with st.container(border=True):
                 col1, col2 = st.columns([1,6])
@@ -183,11 +185,11 @@ if __name__ == "__main__":
             else:
                 missing_opt_vals.append(f'  \n{category} ({", ".join(["Winner " + str(i) for i in results.loc[(results["Winner"].isnull()) & (results["Category"]==category)]["Winner Number"]])})')
 
-        if len(missing_req_vals) > 0 or len(missing_opt_vals) == len(categories.keys()):
+        if len(missing_req_vals) > 0 or len(missing_opt_vals) == len(CATEGORIES.keys()):
             error_string = "**Error:** "
             if len(missing_req_vals) > 0:
                 error_string = error_string + "**Please select names for these required fields:** " + ", ".join(missing_req_vals) + "  \n  \n"
-            if len(missing_opt_vals) == len(categories.keys()):
+            if len(missing_opt_vals) == len(CATEGORIES.keys()):
                 error_string = error_string + "**The following optional fields are empty. At least one of these must be filled.**" + ", ".join(missing_opt_vals) + "  \n  \n"
             elif len(missing_opt_vals) > 0:
                 error_string = error_string + "**The following optional fields are also empty. Please check this is intended.**" + ", ".join(missing_opt_vals) + "  \n  \n"
