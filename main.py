@@ -77,6 +77,7 @@ def submission_popup():
         st.success(output, icon=":material/check_circle:")
 
 
+@st.fragment
 def get_info_for_date():
     date = st.date_input("Date", datetime.now(), format="DD.MM.YYYY")
     cursor.execute(f"SELECT * FROM votes WHERE date = '{date.strftime('%Y-%m-%d')}';")
