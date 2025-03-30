@@ -10,7 +10,6 @@ import streamlit as st
 load = load_dotenv()
 
 st.title("Baarbierians Voting Form")
-# st.write("Fill out the date of the voting, the name of the voting organiser and the results of each category including whether the winner was in the pub or not. After submitting the form, a message will appear which can be posted in the Whatsapp group.")
 
 # Read environment variables
 db_name = os.getenv('dbname')
@@ -77,33 +76,42 @@ def submission_popup():
         st.success(output, icon=":material/check_circle:")
 
 
-@st.fragment
 def get_info_for_date():
-    date = st.date_input("Date", datetime.now(), format="DD.MM.YYYY")
-    cursor.execute(f"SELECT * FROM votes WHERE date = '{date.strftime('%Y-%m-%d')}';")
+    try:
+        cursor.execute(f"SELECT * FROM votes WHERE date = '{st.session_state['date'].strftime('%Y-%m-%d')}';")
+    except:
+        cursor.execute(f"SELECT * FROM votes WHERE date = '{datetime.now().strftime('%Y-%m-%d')}';")
     votes = cursor.fetchall()
 
-    if len(votes) > 0:
+    try:
         votes = pd.DataFrame(votes, columns=["Host", "Date", "Category", "Winner", "In Pub", "Points", "Winner Number"])
         st.session_state["filled_by"] = votes["Host"].iat[0]
+    except:
+        votes = pd.DataFrame(columns=["Host", "Date", "Category", "Winner", "In Pub", "Points", "Winner Number"])
+        st.session_state["filled_by"] = None
 
-        for category in votes["Category"].unique(): 
-            st.session_state["num_winners_" + category.replace("Captains", "Captain's")] = int(votes.loc[votes["Category"]==category]["Winner Number"].max())
+    for category in CATEGORIES.keys():
+        if category.replace("Captain's", "Captains") in votes["Category"].unique(): 
+            st.session_state["num_winners_" + category] = int(votes.loc[votes["Category"]==category.replace("Captain's", "Captains")]["Winner Number"].max())
 
-            for i in range(st.session_state["num_winners_" + category.replace("Captains", "Captain's")]):
-                st.session_state["winner_" + category.replace("Captains", "Captain's") + "_" + str(i+1)] = votes.loc[votes["Category"]==category].iloc[i]["Winner"]
-                st.session_state["in_pub_" + category.replace("Captains", "Captain's") + "_" + str(i+1)] = "Yes" if votes.loc[votes["Category"]==category].iloc[i]["In Pub"] else "No"
+            for i in range(st.session_state["num_winners_" + category]):
+                st.session_state["winner_" + category + "_" + str(i+1)] = votes.loc[votes["Category"]==category.replace("Captain's", "Captains")].iloc[i]["Winner"]
+                st.session_state["in_pub_" + category + "_" + str(i+1)] = "Yes" if votes.loc[votes["Category"]==category.replace("Captain's", "Captains")].iloc[i]["In Pub"] else "No"
+        else:
+            st.session_state["num_winners_" + category] = 1
 
-    return date
+            for i in range(st.session_state["num_winners_" + category]):
+                st.session_state["winner_" + category + "_" + str(i+1)] = None
+                st.session_state["in_pub_" + category + "_" + str(i+1)] = "Yes"
 
 
 @st.fragment
 def voting_host():
-    filled_by = st.selectbox("Voting Host", organisers, key="filled_by", index=None)
+    filled_by = st.selectbox("Voting Host", hosts, key="filled_by", index=None)
 
-    # Conditional input for "Other" organiser
+    # Conditional input for "Other" host
     if filled_by == "Other":
-        filled_by = st.text_input("Enter organiser name")
+        filled_by = st.text_input("Enter host name")
 
     return filled_by
 
@@ -114,11 +122,11 @@ if __name__ == "__main__":
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Fetch organisers
+        # Fetch hosts
         cursor.execute("SELECT DISTINCT filled_by FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
-        organisers = [val[0] for val in cursor.fetchall()]
-        organisers.sort()
-        organisers.append("Other")
+        hosts = [val[0] for val in cursor.fetchall()]
+        hosts.sort()
+        hosts.append("Other")
         
 
         # Fetch players
@@ -127,10 +135,13 @@ if __name__ == "__main__":
         players.sort()
         players.append("Other")
 
-        # Date input outside the form
-        date = get_info_for_date()
+        if "date" not in st.session_state.keys():
+            get_info_for_date()
 
-        # Voting organiser selection outside the form
+        # Date selector
+        date = st.date_input("Date", "today", key="date", format="DD.MM.YYYY", on_change=get_info_for_date)
+
+        # Voting host selection outside the form
         filled_by = voting_host()
 
         results = pd.DataFrame(columns=["Category", "Winner Number", "Winner", "In Pub", "Points"])
