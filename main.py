@@ -9,6 +9,28 @@ import streamlit as st
 
 load = load_dotenv()
 
+def check_password():
+    """Returns `True` if the user had the correct password."""
+    def password_entered():
+        # If you use .streamlit/secrets.toml, replace os.getenv with st.secrets["STREAMLIT_PASSWORD"]
+        if st.session_state["password"] == os.getenv("STREAMLIT_PASSWORD"):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    # Return True if the password is validated.
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Show input for password.
+    st.text_input(
+        "Password", type="password", on_change=password_entered, key="password"
+    )
+    if "password_correct" in st.session_state:
+        st.error("Password incorrect")
+    return False
+
 st.markdown(
     """
         <style>
@@ -23,13 +45,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("Baarbierians Voting Form")
-
 # Read environment variables
-db_name = os.getenv('dbname')
-db_user = os.getenv('user')
-db_password = os.getenv('password')
-db_host = os.getenv('host')
+DB_NAME = os.getenv('dbname')
+DB_USER = os.getenv('user')
+DB_PASSWORD = os.getenv('password')
+DB_HOST = os.getenv('host')
 
 
 # Define categories and if positive
@@ -56,10 +76,10 @@ def get_connection():
     # )
 
     return psycopg2.connect(
-        dbname = db_name,
-        user = db_user,
-        password = db_password,
-        host = db_host
+        dbname = DB_NAME,
+        user = DB_USER,
+        password = DB_PASSWORD,
+        host = DB_HOST
     )
 
 
@@ -133,6 +153,12 @@ def voting_host():
 if __name__ == "__main__":
 
     with st.spinner("Loading ..."):
+
+        st.title("Baarbierians Voting Form")
+
+        if not check_password():
+            st.stop()
+
         conn = get_connection()
         cursor = conn.cursor()
 
