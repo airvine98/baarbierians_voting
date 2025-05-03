@@ -9,6 +9,20 @@ import streamlit as st
 
 load = load_dotenv()
 
+st.markdown(
+    """
+        <style>
+               .block-container {
+                    padding-top: 1rem;
+                    padding-bottom: 0rem;
+                    padding-left: 0rem;
+                    padding-right: 0rem;
+                }
+        </style>
+        """,
+    unsafe_allow_html=True,
+)
+
 st.title("Baarbierians Voting Form")
 
 # Read environment variables
