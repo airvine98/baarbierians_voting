@@ -137,11 +137,14 @@ def get_info_for_date():
 
 @st.fragment
 def voting_host():
+    global hosts
     filled_by = st.selectbox("Voting Host", hosts, key="filled_by", index=None)
 
     # Conditional input for "Other" host
     if filled_by == "Other":
         filled_by = st.text_input("Enter host name")
+        if filled_by in hosts:
+            st.error("This host already exists")
 
     return filled_by
 
@@ -173,7 +176,8 @@ if __name__ == "__main__":
             
         # Fetch players
         cursor.execute("SELECT DISTINCT winner FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
-        players = list(set([val[0] for val in cursor.fetchall()] + [value for key, value in st.session_state.items() if key.startswith("new_player_") and value is not None]))
+        existing_players = [val[0] for val in cursor.fetchall()]
+        players = list(set(existing_players + [value for key, value in st.session_state.items() if key.startswith("new_player_") and value is not None]))
         players.sort()
         players.insert(0, "Other")
 
@@ -204,8 +208,11 @@ if __name__ == "__main__":
                                     winners.append(st.selectbox(f"Winner {i+1}", players, index=None, key=f"winner_{category}_{i+1}"))
                                 if winners[i] == "Other":
                                     winners[i] = st.text_input(f"New player:", key=f"new_player_{category}_{i+1}")
-                                    players.insert(0, winners[i])
-                                    players = sorted(players[:-1]) + players[-1:]
+                                    if winners[i] in existing_players + ["Other"]:
+                                        st.error("This player already exists")
+                                    else:
+                                        players.append(winners[i])
+                                        players = players[:1] + sorted(set(players[1:]))
                     
                             with subcol2:
                                 in_pub.append((st.radio(f"In the Pub?", ("Yes", "No"),
