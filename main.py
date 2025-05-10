@@ -62,7 +62,7 @@ def get_connection():
 
 
 def check_password():
-    if st.session_state["password"] == os.getenv("voting_password"):
+    if st.session_state.get("password") == os.getenv("voting_password"):
         st.session_state["password_correct"] = True
         del st.session_state["password"]
     else:
@@ -137,11 +137,14 @@ def get_info_for_date():
 
 @st.fragment
 def voting_host():
+    global hosts
     filled_by = st.selectbox("Voting Host", hosts, key="filled_by", index=None)
 
     # Conditional input for "Other" host
     if filled_by == "Other":
         filled_by = st.text_input("Enter host name")
+        if filled_by in hosts:
+            st.error("This host already exists")
 
     return filled_by
 
@@ -166,17 +169,17 @@ if __name__ == "__main__":
         cursor.execute("SELECT DISTINCT filled_by FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
         hosts = [val[0] for val in cursor.fetchall()]
         hosts.sort()
-        hosts.append("Other")
-        
-
-        # Fetch players
-        cursor.execute("SELECT DISTINCT winner FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
-        players = [val[0] for val in cursor.fetchall()]
-        players.sort()
-        players.append("Other")
+        hosts.insert(0, "Other")
 
         if "date" not in st.session_state.keys():
             get_info_for_date()
+            
+        # Fetch players
+        cursor.execute("SELECT DISTINCT winner FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
+        existing_players = [val[0] for val in cursor.fetchall()]
+        players = list(set(existing_players + [value for key, value in st.session_state.items() if key.startswith("new_player_") and value is not None]))
+        players.sort()
+        players.insert(0, "Other")
 
         # Date selector
         date = st.date_input("Date", "today", key="date", format="DD.MM.YYYY", on_change=get_info_for_date)
@@ -199,11 +202,17 @@ if __name__ == "__main__":
                         with st.container():
                             subcol1, subcol2 = st.columns([5,1], vertical_alignment="center")
                             with subcol1:
-                                winners.append(st.selectbox(f"Winner {i+1}", players, index=None, key=f"winner_{category}_{i+1}"))
+                                if st.session_state.get(f"winner_{category}_{i+1}") is not None:
+                                    winners.append(st.selectbox(f"Winner {i+1}", players, index=players.index(st.session_state[f"winner_{category}_{i+1}"]), key=f"winner_{category}_{i+1}"))
+                                else:
+                                    winners.append(st.selectbox(f"Winner {i+1}", players, index=None, key=f"winner_{category}_{i+1}"))
                                 if winners[i] == "Other":
                                     winners[i] = st.text_input(f"New player:", key=f"new_player_{category}_{i+1}")
-                                    players.insert(0, winners[i])
-                                    players = sorted(players[:-1]) + players[-1:]
+                                    if winners[i] in existing_players + ["Other"]:
+                                        st.error("This player already exists")
+                                    else:
+                                        players.append(winners[i])
+                                        players = players[:1] + sorted(set(players[1:]))
                     
                             with subcol2:
                                 in_pub.append((st.radio(f"In the Pub?", ("Yes", "No"),
