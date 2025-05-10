@@ -9,28 +9,6 @@ import streamlit as st
 
 load = load_dotenv()
 
-def check_password():
-    """Returns `True` if the user had the correct password."""
-    def password_entered():
-        # If you use .streamlit/secrets.toml, replace os.getenv with st.secrets["STREAMLIT_PASSWORD"]
-        if st.session_state["password"] == os.getenv("STREAMLIT_PASSWORD"):
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-        else:
-            st.session_state["password_correct"] = False
-
-    # Return True if the password is validated.
-    if st.session_state.get("password_correct", False):
-        return True
-
-    # Show input for password.
-    st.text_input(
-        "Password", type="password", on_change=password_entered, key="password"
-    )
-    if "password_correct" in st.session_state:
-        st.error("Password incorrect")
-    return False
-
 st.markdown(
     """
         <style>
@@ -81,6 +59,24 @@ def get_connection():
         password = DB_PASSWORD,
         host = DB_HOST
     )
+
+
+def check_password():
+    if st.session_state["password"] == os.getenv("voting_password"):
+        st.session_state["password_correct"] = True
+        del st.session_state["password"]
+    else:
+        st.session_state["password_correct"] = False
+            
+
+def authenticated():
+    """Returns `True` if the user had the correct password."""
+    if st.session_state.get("password_correct", False):
+        return True
+
+    if "password_correct" in st.session_state:
+        st.error("Password incorrect")
+    return False
 
 
 @st.dialog("Check your submission and confirm")
@@ -152,12 +148,16 @@ def voting_host():
 
 if __name__ == "__main__":
 
+    st.title("Baarbierians Voting Form")
+
+    if not authenticated():
+        # Show input for password.
+        auth_cols = st.columns([7,1], vertical_alignment="bottom")
+        auth_cols[0].text_input("Password", type="password", key="password", placeholder="Enter Password", on_change=check_password)
+        auth_cols[1].button("Submit", use_container_width=True, on_click=check_password)
+        st.stop()
+
     with st.spinner("Loading ..."):
-
-        st.title("Baarbierians Voting Form")
-
-        if not check_password():
-            st.stop()
 
         conn = get_connection()
         cursor = conn.cursor()
@@ -197,7 +197,7 @@ if __name__ == "__main__":
                     in_pub = []
                     for i in range(num_winners):
                         with st.container():
-                            subcol1, subcol2 = st.columns([5,1])
+                            subcol1, subcol2 = st.columns([5,1], vertical_alignment="center")
                             with subcol1:
                                 winners.append(st.selectbox(f"Winner {i+1}", players, index=None, key=f"winner_{category}_{i+1}"))
                                 if winners[i] == "Other":
