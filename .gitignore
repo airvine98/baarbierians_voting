@@ -1,3 +1,6 @@
+**/*.ipynb
+**/*.xlsx
+
 # Ignore folders
 **/archive/*
 **/results/*
