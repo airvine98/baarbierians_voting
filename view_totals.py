@@ -76,7 +76,7 @@ def create_pdf_with_tables(folder: str, category_data: dict):
                     row.cell(str(item).replace("’","'"))
     filename.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(filename)
-    print(f"PDF has been created: {str(filename)}")
+    print(f"\nPDF has been created: {str(filename)}")
 
 
 if __name__ == "__main__":
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     ).date
 
     # Hünenberg holidays calendar https://www.feiertagskalender.ch/export_ical.php?geo=2863
-    url = "https://fcal.ch/privat/fcal_holidays.ics.php?hl=de&klasse=3&geo=2863"
+    url = "https://fcal.ch/free/fcal_holidays.ics.php?free_key=FREE-BLUV-S9L9-9WAJ&klasse=3"
     calendar = Calendar(requests.get(url).text)
     holidays = [x.begin.date() for x in list(calendar.events)]
 
