@@ -1,4 +1,4 @@
-**/*.ipynb
+**/import.ipynb
 **/*.xlsx
 
 # Ignore folders
@@ -114,4 +114,5 @@
 **/.mypy_cache/
 
 # config files
-**/config.*
+**/config*.yml
+**/config*.yaml

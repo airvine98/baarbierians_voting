@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 import pandas as pd
-import psycopg2
+from sqlalchemy import create_engine, text
 import streamlit as st
 # import yaml
 
@@ -28,6 +28,7 @@ DB_NAME = os.getenv('dbname')
 DB_USER = os.getenv('user')
 DB_PASSWORD = os.getenv('password')
 DB_HOST = os.getenv('host')
+DB_PORT = os.getenv('host')
 
 
 # Define categories and if positive
@@ -46,19 +47,9 @@ CATEGORIES = {"Goal of the Night": True,
 def get_connection():
     # config = yaml.safe_load(open("config.yml"))
 
-    # return psycopg2.connect(
-    #     dbname = config["dbname"],
-    #     user = config["user"],
-    #     password = config["password"],
-    #     host = config["host"]
-    # )
+    # return create_engine(f"mysql+mysqlconnector://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}").connect()
 
-    return psycopg2.connect(
-        dbname = DB_NAME,
-        user = DB_USER,
-        password = DB_PASSWORD,
-        host = DB_HOST
-    )
+    return create_engine(f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}").connect()
 
 
 def check_password():
@@ -92,15 +83,15 @@ def submission_popup():
     if confirm:
         placeholder.empty()
         clear_date_query = f"DELETE FROM votes WHERE date = '{date.strftime('%Y-%m-%d')}';"
-        cursor.execute(clear_date_query)
+        conn.execute(text(clear_date_query))
         votes_query = "INSERT INTO votes (date, filled_by, category, winner_num, winner, in_pub, points) VALUES "
         for ind in results.index:
             if results.at[ind, 'Winner'] is not None:
-                votes_query += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{results.at[ind, 'Category']}', {results.at[ind, 'Winner Number']}, '{results.at[ind, 'Winner']}', {str(results.at[ind, 'In Pub']).upper()}, {results.at[ind, 'Points']}), "
+                votes_query += f"('{date.strftime('%Y-%m-%d')}', '{filled_by}', '{results.at[ind, 'Category']}', {results.at[ind, 'Winner Number']}, '{results.at[ind, 'Winner']}', '{str(results.at[ind, 'In Pub'])}', {results.at[ind, 'Points']}), "
         votes_query = votes_query[:-2]
-        votes_query += " ON CONFLICT (date, category, winner_num) DO UPDATE SET filled_by = EXCLUDED.filled_by, winner = EXCLUDED.winner, in_pub = EXCLUDED.in_pub, points = EXCLUDED.points;"
+        votes_query += " ON DUPLICATE KEY UPDATE filled_by = VALUES(filled_by), winner = VALUES(winner), in_pub = VALUES(in_pub), points = VALUES(points);"
         votes_query = votes_query.replace("Captain's", "Captains")
-        cursor.execute(votes_query)
+        conn.execute(text(votes_query))
         conn.commit()
         output = "**Votes submitted**  \nPlease copy the votes above and send in the WhatsApp group."
         st.success(output, icon=":material/check_circle:")
@@ -108,10 +99,10 @@ def submission_popup():
 
 def get_info_for_date():
     try:
-        cursor.execute(f"SELECT * FROM votes WHERE date = '{st.session_state['date'].strftime('%Y-%m-%d')}';")
+        result = conn.execute(text(f"SELECT * FROM votes WHERE date = '{st.session_state['date'].strftime('%Y-%m-%d')}';"))
     except:
-        cursor.execute(f"SELECT * FROM votes WHERE date = '{datetime.now().strftime('%Y-%m-%d')}';")
-    votes = cursor.fetchall()
+        result = conn.execute(text(f"SELECT * FROM votes WHERE date = '{datetime.now().strftime('%Y-%m-%d')}';"))
+    votes = result.fetchall()
 
     try:
         votes = pd.DataFrame(votes, columns=["Host", "Date", "Category", "Winner", "In Pub", "Points", "Winner Number"])
@@ -119,6 +110,9 @@ def get_info_for_date():
     except:
         votes = pd.DataFrame(columns=["Host", "Date", "Category", "Winner", "In Pub", "Points", "Winner Number"])
         st.session_state["filled_by"] = None
+    
+    votes["In Pub"] = votes["In Pub"].str.upper().eq("TRUE")
+    votes[['Points', "Winner Number"]] = votes[['Points', "Winner Number"]].map(int)
 
     for category in CATEGORIES.keys():
         if category.replace("Captain's", "Captains") in votes["Category"].unique(): 
@@ -163,11 +157,10 @@ if __name__ == "__main__":
     with st.spinner("Loading ..."):
 
         conn = get_connection()
-        cursor = conn.cursor()
 
         # Fetch hosts
-        cursor.execute("SELECT DISTINCT filled_by FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
-        hosts = [val[0] for val in cursor.fetchall()]
+        result = conn.execute(text("SELECT DISTINCT filled_by FROM votes WHERE date > (CURRENT_DATE - INTERVAL 3 YEAR);"))
+        hosts = [val[0] for val in result.fetchall()]
         hosts.sort()
         hosts.insert(0, "Other")
 
@@ -175,8 +168,8 @@ if __name__ == "__main__":
             get_info_for_date()
             
         # Fetch players
-        cursor.execute("SELECT DISTINCT winner FROM votes WHERE date > CURRENT_DATE - INTERVAL '3 years';")
-        existing_players = [val[0] for val in cursor.fetchall()]
+        result = conn.execute(text("SELECT DISTINCT winner FROM votes WHERE date > (CURRENT_DATE - INTERVAL 3 YEAR);"))
+        existing_players = [val[0] for val in result.fetchall()]
         players = list(set(existing_players + [value for key, value in st.session_state.items() if key.startswith("new_player_") and value is not None]))
         players.sort()
         players.insert(0, "Other")

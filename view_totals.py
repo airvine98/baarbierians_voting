@@ -1,8 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from fpdf import FPDF
-from fpdf.fonts import FontFace
+from fpdf import FPDF, FontFace
 from ics import Calendar
 import pandas as pd
 import requests
@@ -10,8 +9,8 @@ from sqlalchemy import create_engine
 import yaml
 
 
-TOTALS_START_DATE = "2024-11-09" # None
-TOTALS_END_DATE = "2025-11-08" # None
+TOTALS_START_DATE = "2025-11-09" # None
+TOTALS_END_DATE = "2026-11-14" # None
 
 
 def get_connection():
@@ -21,7 +20,8 @@ def get_connection():
         _engine.Engine: Engine to connect to database
     """
     config = yaml.safe_load(open("config.yml"))
-    return create_engine(f"postgresql+psycopg2://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}")
+
+    return create_engine(f"mysql+mysqlconnector://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}")
 
 
 def create_pdf_with_tables(folder: str, category_data: dict):
@@ -49,7 +49,11 @@ def create_pdf_with_tables(folder: str, category_data: dict):
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
-    font_name = "Helvetica"
+    pdf.add_font("noto-serif", style="", fname="noto-serif/NotoSerif-Regular.ttf")
+    pdf.add_font("noto-serif", style="b", fname="noto-serif/NotoSerif-Bold.ttf")
+    pdf.add_font("noto-serif", style="i", fname="noto-serif/NotoSerif-Italic.ttf")
+    pdf.add_font("noto-serif", style="bi", fname="noto-serif/NotoSerif-BoldItalic.ttf")
+    font_name = "noto-serif"
     pdf.set_font(font_name, size=10)
     headings_style = FontFace(font_name, emphasis="BOLD", fill_color=[170]*3)
 
@@ -67,7 +71,7 @@ def create_pdf_with_tables(folder: str, category_data: dict):
             headers = [x.replace("_", " ").title() for x in df.columns]
             row = table.row()
             for header in headers:
-                row.cell(header)
+                row.cell(header.replace("‘","'"))
 
             # Add table rows
             for index, vals in df.iterrows():
@@ -99,7 +103,7 @@ if __name__ == "__main__":
     dates_query = f"SELECT DISTINCT date FROM votes ORDER BY date ASC;"
     dates = pd.read_sql(dates_query, engine)["date"].to_list()
 
-    missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays_excl_holidays if date not in dates]
+    missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays_excl_holidays if date.isoformat() not in dates]
 
     if len(missing_fridays) > 0:
         print("\nMissing Fridays:\n" + "\n".join(missing_fridays))
@@ -131,6 +135,7 @@ if __name__ == "__main__":
         totals_query = totals_query + f" GROUP BY winner ORDER BY points {'DESC' if positive else 'ASC'}, votes_won DESC;"
         totals_query = totals_query.replace("Captain's", "Captains")
         df = pd.read_sql(totals_query, engine)
+        df["points"] = df["points"].astype(int)
         category_data[category] = df.head(30)
 
     # Create PDF
