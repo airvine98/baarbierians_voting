@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import URL, create_engine, text
 import streamlit as st
 # import yaml
 
@@ -45,11 +45,25 @@ CATEGORIES = {"Goal of the Night": True,
 
 # Function to get database connection
 def get_connection():
-    # config = yaml.safe_load(open("config.yml"))
+    print("Building database URL...", flush=True)
 
-    # return create_engine(f"mysql+mysqlconnector://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}").connect()
+    url = URL.create(
+        drivername="mysql+mysqlconnector",
+        username=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=int(DB_PORT),
+        database=DB_NAME,
+    )
 
-    return create_engine(f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}").connect()
+    print("Creating SQLAlchemy engine...", flush=True)
+    engine = create_engine(url, echo=True, pool_pre_ping=True)
+
+    print("Engine created; connecting...", flush=True)
+    connection = engine.connect()
+
+    print("Database connected", flush=True)
+    return connection
 
 
 def check_password():
@@ -156,7 +170,9 @@ if __name__ == "__main__":
 
     with st.spinner("Loading ..."):
 
+        print("Password accepted, opening database connection...")
         conn = get_connection()
+        print("Database connection opened")
 
         # Fetch hosts
         result = conn.execute(text("SELECT DISTINCT filled_by FROM votes WHERE date > (CURRENT_DATE - INTERVAL 3 YEAR);"))
