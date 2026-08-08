@@ -1,11 +1,26 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import URL, create_engine, text
 import yaml
 
 # Function to get database connection
 def get_connection():
-    config = yaml.safe_load(open("config.yml"))
+    config = yaml.safe_load(open("config.yml", "r"))
 
-    return create_engine(f"mysql+mysqlconnector://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}", echo=True).connect()
+    DB_NAME = config['dbname']
+    DB_USER = config['user']
+    DB_PASSWORD = config['password']
+    DB_HOST = config['host']
+    DB_PORT = config['port']
+
+    url = URL.create(
+        drivername="mysql+mysqlconnector",
+        username=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=int(DB_PORT),
+        database=DB_NAME,
+    )
+
+    return create_engine(url, echo=True).connect()
 
 # Function to check database connection
 def check_connection():

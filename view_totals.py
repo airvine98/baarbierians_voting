@@ -5,7 +5,7 @@ from fpdf import FPDF, FontFace
 from ics import Calendar
 import pandas as pd
 import requests
-from sqlalchemy import create_engine
+from sqlalchemy import URL, create_engine
 import yaml
 
 
@@ -19,9 +19,24 @@ def get_connection():
     Returns:
         _engine.Engine: Engine to connect to database
     """
-    config = yaml.safe_load(open("config.yml"))
+    config = yaml.safe_load(open("config.yml", "r"))
 
-    return create_engine(f"mysql+mysqlconnector://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['dbname']}")
+    DB_NAME = config['dbname']
+    DB_USER = config['user']
+    DB_PASSWORD = config['password']
+    DB_HOST = config['host']
+    DB_PORT = config['port']
+
+    url = URL.create(
+        drivername="mysql+mysqlconnector",
+        username=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=int(DB_PORT),
+        database=DB_NAME,
+    )
+
+    return create_engine(url)
 
 
 def create_pdf_with_tables(folder: str, category_data: dict):
@@ -33,16 +48,16 @@ def create_pdf_with_tables(folder: str, category_data: dict):
     """
     
     if TOTALS_START_DATE is None and TOTALS_END_DATE is None:
-        filename = f"voting_results_all_time.pdf"
-        title_text_dates = 'all time'
+        filename = f"voting-results_since-records-began.pdf"
+        title_text_dates = 'since records began'
     elif TOTALS_START_DATE is None and TOTALS_END_DATE is not None:
-        filename = f"voting_results_until_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf"
+        filename = f"voting-results_since-records-began_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf"
         title_text_dates = f'until {pd.to_datetime(TOTALS_END_DATE).date().strftime("%d/%m/%Y")}'
     elif TOTALS_START_DATE is not None and TOTALS_END_DATE is None:
-        filename = f"voting_results_since_{pd.to_datetime(TOTALS_START_DATE).date()}.pdf"
+        filename = f"voting-results_since_{pd.to_datetime(TOTALS_START_DATE).date()}.pdf"
         title_text_dates = f'since {pd.to_datetime(TOTALS_START_DATE).date().strftime("%d/%m/%Y")}'
     else:
-        filename = f"voting_results_{pd.to_datetime(TOTALS_START_DATE).date()}_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf"
+        filename = f"voting-results_{pd.to_datetime(TOTALS_START_DATE).date()}_{pd.to_datetime(TOTALS_END_DATE).date()}.pdf"
         title_text_dates = f'{pd.to_datetime(TOTALS_START_DATE).date().strftime("%d/%m/%Y")} - {pd.to_datetime(TOTALS_END_DATE).date().strftime("%d/%m/%Y")}'
 
     filename = Path(folder).joinpath(filename)
@@ -89,7 +104,7 @@ if __name__ == "__main__":
     # Check for missing fridays
     fridays = pd.date_range(
         start=max(pd.to_datetime(TOTALS_START_DATE) if TOTALS_START_DATE is not None else pd.to_datetime("2014-01-01"), pd.to_datetime("2014-01-01")),
-        end=min(pd.to_datetime(TOTALS_END_DATE) if TOTALS_END_DATE is not None else datetime.now(), datetime.now()),
+        end=pd.to_datetime(TOTALS_END_DATE) if TOTALS_END_DATE is not None else datetime.now(),
         freq="W-FRI"
     ).date
 
@@ -103,7 +118,7 @@ if __name__ == "__main__":
     dates_query = f"SELECT DISTINCT date FROM votes ORDER BY date ASC;"
     dates = pd.read_sql(dates_query, engine)["date"].to_list()
 
-    missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays_excl_holidays if date.isoformat() not in dates]
+    missing_fridays = [date.strftime("%d.%m.%Y") for date in fridays_excl_holidays if date not in dates]
 
     if len(missing_fridays) > 0:
         print("\nMissing Fridays:\n" + "\n".join(missing_fridays))

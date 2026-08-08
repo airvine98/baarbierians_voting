@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 import pandas as pd
@@ -14,13 +15,20 @@ st.markdown(
         <style>
                .block-container {
                     padding-top: 1rem;
-                    padding-bottom: 0rem;
-                    padding-left: 0rem;
-                    padding-right: 0rem;
+                    padding-bottom: 1rem;
+                    padding-left: 1rem;
+                    padding-right: 1rem;
                 }
         </style>
         """,
     unsafe_allow_html=True,
+)
+
+st.set_page_config(
+    page_title="Baarbierians Voting", 
+    page_icon=str(Path("images/badge.ico")), 
+    layout="centered", 
+    initial_sidebar_state="collapsed"
 )
 
 # Read environment variables
@@ -29,6 +37,18 @@ DB_USER = os.getenv('user')
 DB_PASSWORD = os.getenv('password')
 DB_HOST = os.getenv('host')
 DB_PORT = os.getenv('port')
+VOTING_PASSWORD = os.getenv("voting_password")
+
+
+# # Get variables from local config file (for testing)
+# config = yaml.safe_load(open("config.yml", "r"))
+
+# DB_NAME = config['dbname']
+# DB_USER = config['user']
+# DB_PASSWORD = config['password']
+# DB_HOST = config['host']
+# DB_PORT = config['port']
+# VOTING_PASSWORD = config['form password']
 
 
 # Define categories and if positive
@@ -67,7 +87,7 @@ def get_connection():
 
 
 def check_password():
-    if st.session_state.get("password") == os.getenv("voting_password"):
+    if st.session_state.get("password") == VOTING_PASSWORD:
         st.session_state["password_correct"] = True
         del st.session_state["password"]
     else:
@@ -163,9 +183,8 @@ if __name__ == "__main__":
 
     if not authenticated():
         # Show input for password.
-        auth_cols = st.columns([7,1], vertical_alignment="bottom")
-        auth_cols[0].text_input("Password", type="password", key="password", placeholder="Enter Password", on_change=check_password)
-        auth_cols[1].button("Submit", use_container_width=True, on_click=check_password)
+        st.text_input("Password", type="password", key="password", placeholder="Enter Password", on_change=check_password)
+        st.button("Submit", use_container_width=True, on_click=check_password)
         st.stop()
 
     with st.spinner("Loading ..."):
@@ -175,7 +194,7 @@ if __name__ == "__main__":
         print("Database connection opened")
 
         # Fetch hosts
-        result = conn.execute(text("SELECT DISTINCT filled_by FROM votes WHERE date > (CURRENT_DATE - INTERVAL 3 YEAR);"))
+        result = conn.execute(text("SELECT DISTINCT filled_by FROM votes;"))
         hosts = [val[0] for val in result.fetchall()]
         hosts.sort()
         hosts.insert(0, "Other")
@@ -184,7 +203,7 @@ if __name__ == "__main__":
             get_info_for_date()
             
         # Fetch players
-        result = conn.execute(text("SELECT DISTINCT winner FROM votes WHERE date > (CURRENT_DATE - INTERVAL 3 YEAR);"))
+        result = conn.execute(text("SELECT DISTINCT winner FROM votes;"))
         existing_players = [val[0] for val in result.fetchall()]
         players = list(set(existing_players + [value for key, value in st.session_state.items() if key.startswith("new_player_") and value is not None]))
         players.sort()
